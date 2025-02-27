@@ -5,7 +5,7 @@ local humanoid = character:WaitForChild("Humanoid")
 
 -- Create and load the running animation
 local anim = Instance.new("Animation")
-anim.AnimationId = "rbxassetid://17286628947"
+anim.AnimationId = "rbxassetid://" -- Insert animation ID here
 local runAnimation = humanoid:LoadAnimation(anim)
 
 -- Define movement speeds and timing for boosts and cooldowns
