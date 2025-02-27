@@ -1,63 +1,39 @@
+-- Get the local player and its character
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
+-- Create and load the running animation
 local anim = Instance.new("Animation")
-anim.AnimationId = "" -- Insert Own Animation Id Here
-
+anim.AnimationId = "rbxassetid://17286628947"
 local runAnimation = humanoid:LoadAnimation(anim)
 
+-- Define movement speeds and timing for boosts and cooldowns
 local defaultWalkSpeed = 16
 local runWalkSpeed = 35
 local boostedRunWalkSpeed = 53
-local boostDuration = 5
-local cooldownDuration = 3
+local boostDuration = 5  -- Time before speed boost activates
+local cooldownDuration = 3 -- Cooldown after stopping running
 
-humanoid.WalkSpeed = defaultWalkSpeed
+humanoid.WalkSpeed = defaultWalkSpeed -- Set default walking speed
 
+-- Camera settings for FOV changes during running
 local camera = game.Workspace.CurrentCamera
 local defaultFOV = camera.FieldOfView
 local targetFOV = defaultFOV + 20
 local boostedFOV = defaultFOV + 50
 
+-- Services required for animations and user input handling
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
+-- Track running state and cooldowns
 local isRunning = false
 local isCooldownActive = false
 local lastRunTime = 0
-local bobbingTime = 0
-local update = Vector3.new(0, 0, 0)
 
-local Angle = 1.5 -- Screen tilt intensity
-local BobbingAmount = 0.05 -- Walk bobbing intensity
-local TimeScale = math.clamp(humanoid.WalkSpeed / 16, 0.5, 2) -- Bobbing speed
-
-local function lerp(a, b, c)
-	return a + (b - a) * c
-end
-
-local function updateCamera(deltaTime)
-	if humanoid.Health <= 0 then return end
-
-	local MouseDelta = UserInputService:GetMouseDelta().X
-
-	-- Apply camera tilt based on mouse movement
-	update = lerp(update, Vector3.new(math.clamp(MouseDelta, -Angle, Angle), math.random(-Angle, Angle), math.random(-Angle, Angle)), 0.25 * deltaTime * 60)
-
-	-- Walk bobbing effect
-	local Walking = humanoid.MoveDirection.Magnitude > 0.01
-	local WalkBobbing = Walking and Vector3.new(
-		math.sin(time() * humanoid.WalkSpeed * 0.5) * BobbingAmount * TimeScale,
-		math.sin(time() * humanoid.WalkSpeed * 0.3) * BobbingAmount * TimeScale,
-		math.sin(time() * humanoid.WalkSpeed * 0.7) * BobbingAmount * TimeScale
-	) or Vector3.new(0, 0, 0)
-
-	-- Apply bobbing and tilt without locking camera movement
-	camera.CFrame = camera.CFrame * CFrame.fromEulerAnglesXYZ(math.rad(WalkBobbing.X), math.rad(WalkBobbing.Y), math.rad(WalkBobbing.Z)) * CFrame.fromEulerAnglesXYZ(0, 0, math.rad(update.X))
-end
-
+-- Creates parameters for the running particle effect
 local function createParticleParams()
 	return {
 		Orientation = Enum.ParticleOrientation.VelocityParallel,
@@ -77,20 +53,14 @@ local function createParticleParams()
 		EmissionDirection = Enum.NormalId.Back,
 		Rotation = 180,
 		Lifetime = NumberRange.new(0.9),
-		Rate = 16,
-		LightEmission = 0,
-		LightInfluence = 1,
-		Speed = NumberRange.new(5),
-		Shape = Enum.ParticleEmitterShape.Box,
-		ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward,
-		ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume,
-		TimeScale = 1
+		Rate = 16
 	}
 end
 
 local params = createParticleParams()
 local particle1, particle2
 
+-- Creates a particle emitter attached to the player's character
 local function createParticleEmitter(color)
 	local emitter = Instance.new("ParticleEmitter")
 	local part = Instance.new("Part")
@@ -115,16 +85,10 @@ local function createParticleEmitter(color)
 	emitter.Lifetime = params.Lifetime
 	emitter.Rate = params.Rate
 	emitter.Parent = part
-	emitter.LightEmission = params.LightEmission
-	emitter.LightInfluence = params.LightInfluence
-	emitter.Speed = params.Speed
-	emitter.Shape = params.Shape
-	emitter.ShapeInOut = params.ShapeInOut
-	emitter.ShapeStyle = params.ShapeStyle
-	emitter.TimeScale = params.TimeScale
 	return emitter
 end
 
+-- Starts the running animation, increases speed, creates particles, and changes FOV
 local function playRunAnimation()
 	isRunning = true
 	lastRunTime = tick()
@@ -140,6 +104,7 @@ local function playRunAnimation()
 	fovTween:Play()
 end
 
+-- Stops the running animation, resets speed, removes particles, and resets FOV
 local function stopRunAnimation()
 	isRunning = false
 	runAnimation:Stop()
@@ -155,6 +120,7 @@ local function stopRunAnimation()
 	end
 end
 
+-- Detects when the Left Shift key is pressed and starts running
 UserInputService.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.LeftShift then
 		if not isRunning and not isCooldownActive and humanoid.MoveDirection.Magnitude > 0 then
@@ -163,12 +129,14 @@ UserInputService.InputBegan:Connect(function(input)
 	end
 end)
 
+-- Detects when the Left Shift key is released and stops running
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.LeftShift then
 		stopRunAnimation()
 	end
 end)
 
+-- Continuously checks running state, applies boost after duration, and resets FOV if needed
 RunService.Stepped:Connect(function(deltaTime)
 	if isRunning then
 		local elapsed = tick() - lastRunTime
@@ -178,25 +146,17 @@ RunService.Stepped:Connect(function(deltaTime)
 			local fovTween = TweenService:Create(camera, tweenInfo, {FieldOfView = boostedFOV})
 			fovTween:Play()
 		end
-
-		-- View Bobbing Effect
-		updateCamera(deltaTime)
 	end
 
-	-- Stop animation if not moving
+	-- Stops running if the player stops moving
 	if humanoid.MoveDirection.Magnitude == 0 and isRunning then
 		stopRunAnimation()
 	end
 
-	-- Reset FOV when stopping
+	-- Resets FOV when not running
 	if not isRunning and camera.FieldOfView ~= defaultFOV then
 		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		local fovResetTween = TweenService:Create(camera, tweenInfo, {FieldOfView = defaultFOV})
 		fovResetTween:Play()
 	end
 end)
-
-for i = 1, 10 do
-	print("Initializing run system... Step " .. i)
-	task.wait(0.1)
-end
